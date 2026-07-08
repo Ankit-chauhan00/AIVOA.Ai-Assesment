@@ -267,6 +267,8 @@ async def search_hcp(query: str) -> str:
     used to auto complete the HCP name field and pull to prior context
     """
 
+    query = query.replace("Dr.", "").replace("Dr", "").strip()
+
     async with async_session_factory() as db:
         try:
             result = await db.execute(

@@ -4,6 +4,7 @@ LangGraph assistant pannel that powers the "AI Assistant" chat pannel on the log
 
 import asyncio
 from typing import Annotated, TypedDict
+import json
 
 from app.agent.llm import reasoning_llm
 from app.agent.tools import ALL_TOOLS
@@ -34,12 +35,13 @@ Available tools:
    - Return matching HCPs from the CRM.
 
 4. suggest_followups
-   - Use when the user asks for recommendations or follow-up actions for a previously logged interaction.
-   - Requires the interaction ID.
+- Use when the user asks for recommendations or follow-up actions.
+- Requires the interaction ID.
 
 5. schedule_followup
-   - Use when the user wants to create a follow-up task.
-   - Requires the interaction ID and the follow-up task description.
+- Use only when the user explicitly asks to create or schedule a follow-up task.
+- Requires the interaction ID and the follow-up task description.
+- Do not automatically schedule follow-up tasks after logging an interaction.
 
 General Guidelines:
 - Always determine whether a tool is needed before responding.
@@ -50,6 +52,16 @@ General Guidelines:
 - If a tool returns an error, explain the error politely and suggest what information is needed to continue.
 - Keep responses concise, professional, and suitable for a Pharma CRM application.
 - Do not expose internal implementation details unless the user explicitly asks for them.
+
+Interaction Management Rules
+
+- If the conversation history already indicates that an interaction has just been logged, do NOT call log_interaction again.
+
+- Never create duplicate interactions for the same conversation unless the user explicitly says they are describing a new meeting.
+
+- If the user asks to update, modify, edit, or change an interaction that was just logged, call edit_interaction only.
+
+- Do not search for an HCP before editing an interaction unless the interaction ID or HCP cannot be determined from the conversation.
 """
 
 models_with_tools = reasoning_llm.bind_tools(ALL_TOOLS)
@@ -138,8 +150,10 @@ async def run_agent(
 
     tool_calls = []
     tool_results = []
+    form_data = None
 
     for message in result["messages"]:
+
         # AI requested a tool
         if getattr(message, "tool_calls", None):
             for tool in message.tool_calls:
@@ -152,11 +166,24 @@ async def run_agent(
 
         # Tool execution result
         if getattr(message, "type", None) == "tool":
+
+            output = message.content
+
+            # Convert json String -> Python dict
+            try:
+                output = json.loads(output)
+            except Exception:
+                pass
+
+            # Save form_data if present
+            if isinstance(output, dict) and "form_data" in output:
+                form_data = output["form_data"]
+
             tool_results.append(
-                {
-                    "tool_name": getattr(message, "name", ""),
-                    "output": message.content,
-                }
+            {
+                "tool_name": getattr(message, "name", ""),
+                "output": output,
+            }
             )
 
         execution_trace = ["Received user message"]
@@ -174,6 +201,7 @@ async def run_agent(
         "tool_calls": tool_calls,
         "tool_results": tool_results,
         "execution_trace": execution_trace,
+        "form_data": form_data
     }
 
 
