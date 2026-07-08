@@ -16,13 +16,14 @@ interaction, extract a strict JSON object with these fields:
 
 •⁠  hcp_name (string)
 •⁠  interaction_type (one of: Meeting, Call, Email, Conference)
-•⁠  topics_discussed (string, concise)
+•  products_discussed (string, concise — the specific product/brand names mentioned)
+•⁠  topics_discussed (string, concise — the broader subject or context of the conversation)
 •⁠  materials_shared (list of strings)
 •⁠  samples_distributed (list of strings)
 •⁠  sentiment (one of: positive, neutral, negative)
 •  outcomes (string, concise)
 •⁠  follow_up_actions (string, concise)
-•⁠  speciality on the hcp in just one word string
+•⁠  specialty on the hcp in just one word string
 •⁠  hospital just the name of hospital
 •⁠  city just the name of the city
 
@@ -102,18 +103,17 @@ async def log_interaction(text: str) -> str:
 
         
     data = _safe_json(raw) or {}
-    print("=" * 50)
-    print("PARSED JSON")
-    print(data)
-    print("=" * 50)
 
     hcp_name = data.get("hcp_name") or "Unknown HCP"
     interaction_type = data.get("interaction_type") or "Meeting"
-    materials = data.get("materials_shared") or []
-    samples = data.get("samples_distributed") or []
-    speciality = data.get("speciality", "")
+    specialty = data.get("specialty", "")
     hospital = data.get("hospital", "")
     city = data.get("city", "")
+    products_discussed_field = data.get("products_discussed") or ""
+    materials = data.get("materials_shared") or []
+    samples = data.get("samples_distributed") or []
+    combined_products = ", ".join(filter(None, [products_discussed_field] + materials + samples))
+
 
     # suggestion = _suggest_follow_ups(hcp_name,topics,sentiment, outcomes)
 
@@ -134,7 +134,7 @@ async def log_interaction(text: str) -> str:
             if hcp is None:
                 hcp = HCP(
                     name=hcp_name,
-                    specialty=speciality,
+                    specialty=specialty,
                     hospital=hospital,
                     city=city,
                 )
@@ -150,7 +150,7 @@ async def log_interaction(text: str) -> str:
                 interaction_type=interaction_type,
                 interaction_date=datetime.utcnow().date(),
                 notes=text,
-                products_discussed=", ".join(materials + samples),
+                products_discussed=combined_products,
             )
 
             db.add(interaction)

@@ -7,6 +7,7 @@ const client = axios.create({
 })
 
 export async function sendChatMessage(message, history = []) {
-  const { data } = await client.post('/chat', { message, history })
+  const formattedHistory = history.map((h) => [h.role, h.content])
+  const { data } = await client.post('/chat', { message, history: formattedHistory })
   return data
 }
