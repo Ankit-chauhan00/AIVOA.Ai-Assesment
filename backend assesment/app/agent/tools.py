@@ -424,18 +424,4 @@ async def schedule_followup(
             await db.rollback()
             return json.dumps({"status": "error", "message": str(e)})
 
-
-async def main():
-    result = await schedule_followup.ainvoke(
-        {
-            "interaction_id": 1,
-            "task_from_interaction": "Schedule a follow-up meeting with Dr. Raj Sharma",
-            "days_from_now": 14,
-        }
-    )
-
-    print(result)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+ALL_TOOLS = [log_interaction,edit_interaction, search_hcp, suggest_followups, schedule_followup]
