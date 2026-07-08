@@ -1,13 +1,13 @@
 import json
 from datetime import datetime
+from typing import List, cast
 
-from app.agent.llm import extraction_llm
+from app.agent.llm import extraction_llm, reasoning_llm
 from app.db.session import async_session_factory
 from app.models.hcp_model import HCP
 from app.models.intraction_model import Interaction
 from langchain_core.tools import tool
-from sqlalchemy import select
-
+from sqlalchemy import or_, select
 import asyncio
 
 EXTRACTION_PROMPT = """You are a data-extraction assistant for a pharma CRM.
@@ -195,28 +195,27 @@ async def edit_interaction(
             )
 
         if notes is not None:
-            interaction.notes = notes # type: ignore[assignment]
+            interaction.notes = notes  # type: ignore[assignment]
         if interaction_type is not None:
-            interaction.interaction_type = interaction_type # type: ignore[assignment]
+            interaction.interaction_type = interaction_type  # type: ignore[assignment]
 
         if products_discussed is not None:
-            interaction.products_discussed = products_discussed # type: ignore[assignment]
+            interaction.products_discussed = products_discussed  # type: ignore[assignment]
 
-        
         await db.commit()
         await db.refresh(interaction)
 
         return json.dumps(
-        {
-            "status": "success",
-            "interaction_id": interaction.id,
-            "message": "Interaction updated successfully.",
-        }
-    )
+            {
+                "status": "success",
+                "interaction_id": interaction.id,
+                "message": "Interaction updated successfully.",
+            }
+        )
 
 
 @tool("search_hcp")
-async def search_hcp(query: str)->str:
+async def search_hcp(query: str) -> str:
     """
     Search for HCPs (Health care proffesional) by name speciality or hospital
     used to auto complete the HCP name field and pull to prior context
@@ -235,7 +234,7 @@ async def search_hcp(query: str)->str:
                 )
             )
 
-            hcps = result.scalar().all()
+            hcps = result.scalars().all()
 
             return json.dumps(
                 [
@@ -258,9 +257,107 @@ async def search_hcp(query: str)->str:
             )
 
 
-def 
+def _suggest_followups_raw(
+    hcp_name: str,
+    topic: str,
+    sentiments: str,
+    outcomes: str,
+    speciality: str,
+    hospital: str,
+    city: str,
+) -> List[str]:
+
+    prompt = FOLLOWUP_PROMPT.format(
+        hcp_name=hcp_name,
+        topics=topic,
+        sentiment=sentiments,
+        outcomes=outcomes,
+        speciality=speciality,
+        hospital=hospital,
+        city=city,
+    )
+    raw = reasoning_llm.invoke(prompt).content
+    if isinstance(raw, list):
+        raw = "".join(
+            item if isinstance(item, str) else json.dumps(item) for item in raw
+        )
+    print(raw) 
+
+    data = _safe_json(raw)
+    if isinstance(data, list):
+        return data[:3]
+    return []
 
 
+@tool("suggest_followups")
+async def suggest_followups(interaction_id: int) -> str:
+    """
+    Generate AI Suggestion follow-ups action for alredy logged interaction
+    """
+
+    async with async_session_factory() as db:
+        try:
+            result = await db.execute(
+                select(Interaction).where(Interaction.id == interaction_id)
+            )
+
+            interaction = result.scalar_one_or_none()
+
+            if interaction is None:
+                return json.dumps(
+                    {"status": "error", "message": "Interaction not found"}
+                )
+
+            # Fetch HCP
+            result = await db.execute(select(HCP).where(HCP.id == interaction.hcp_id))
+
+            hcp = result.scalar_one_or_none()
+
+            if hcp is None:
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "message": "HCP not found",
+                    }
+                )
+
+            # Re-extract details from interaction notes
+            prompt = EXTRACTION_PROMPT.format(text=interaction.notes)
+
+            raw = extraction_llm.invoke(prompt).content
+
+            if isinstance(raw, list):
+                raw = "".join(
+                    item if isinstance(item, str) else json.dumps(item) for item in raw
+                )
+
+            data = _safe_json(raw) or {}
+
+            suggestions = _suggest_followups_raw(
+                hcp_name=cast(str,hcp.name),
+                topic=data.get("topics_discussed", ""),
+                sentiments=data.get("sentiment", "neutral"),
+                outcomes=data.get("outcomes", ""),
+                speciality = cast(str, hcp.specialty or ""),
+                hospital = cast(str, hcp.hospital or ""),
+                city = cast(str, hcp.city or "")
+            )
+
+            return json.dumps(
+                {
+                    "status": "success",
+                    "interaction_id": interaction.id,
+                    "hcp_name": hcp.name,
+                    "suggestions": suggestions,
+                }
+            )
+        except Exception as e:
+            return json.dumps(
+                {
+                    "status": "error",
+                    "message": str(e),
+                }
+            )
 
 
 # async def main():
@@ -295,6 +392,15 @@ def
 #     print(result)
 
 
+async def main():
+    result = await suggest_followups.ainvoke(
+        {
+            "interaction_id": 1
+        }
+    )
 
-# if __name__ == "__main__":
-    # asyncio.run(main())
+    print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
