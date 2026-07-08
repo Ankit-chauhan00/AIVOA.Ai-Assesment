@@ -1,14 +1,15 @@
+import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, cast
 
 from app.agent.llm import extraction_llm, reasoning_llm
 from app.db.session import async_session_factory
+from app.models.followUp_model import FollowUpTask
 from app.models.hcp_model import HCP
 from app.models.intraction_model import Interaction
 from langchain_core.tools import tool
 from sqlalchemy import or_, select
-import asyncio
 
 EXTRACTION_PROMPT = """You are a data-extraction assistant for a pharma CRM.
 Given a free-text note or transcript of a sales rep describing an HCP (Healthcare Professional)
@@ -184,9 +185,6 @@ async def edit_interaction(
         interaction = result.scalar_one_or_none()
 
         if interaction is None:
-            return json.dumps({"status": "error", "message": "Interaction not found"})
-
-        if interaction is None:
             return json.dumps(
                 {
                     "status": "error",
@@ -214,6 +212,9 @@ async def edit_interaction(
         )
 
 
+# ---------------------------------------------------------------------------
+# Tool 3: Search HCP
+# ---------------------------------------------------------------------------
 @tool("search_hcp")
 async def search_hcp(query: str) -> str:
     """
@@ -281,12 +282,17 @@ def _suggest_followups_raw(
         raw = "".join(
             item if isinstance(item, str) else json.dumps(item) for item in raw
         )
-    print(raw) 
+    print(raw)
 
     data = _safe_json(raw)
     if isinstance(data, list):
         return data[:3]
     return []
+
+
+# ---------------------------------------------------------------------------
+# Tool 4: Suggest follow ups on the basi of the interaction-> notes
+# ---------------------------------------------------------------------------
 
 
 @tool("suggest_followups")
@@ -334,13 +340,13 @@ async def suggest_followups(interaction_id: int) -> str:
             data = _safe_json(raw) or {}
 
             suggestions = _suggest_followups_raw(
-                hcp_name=cast(str,hcp.name),
+                hcp_name=cast(str, hcp.name),
                 topic=data.get("topics_discussed", ""),
                 sentiments=data.get("sentiment", "neutral"),
                 outcomes=data.get("outcomes", ""),
-                speciality = cast(str, hcp.specialty or ""),
-                hospital = cast(str, hcp.hospital or ""),
-                city = cast(str, hcp.city or "")
+                speciality=cast(str, hcp.specialty or ""),
+                hospital=cast(str, hcp.hospital or ""),
+                city=cast(str, hcp.city or ""),
             )
 
             return json.dumps(
@@ -360,42 +366,71 @@ async def suggest_followups(interaction_id: int) -> str:
             )
 
 
-# async def main():
-#     result = await log_interaction.ainvoke(
-#         {
-#             "text": """
-#             Visited Dr. Ankit Chauhan, Neurologist at Manipal Hospital, Bengaluru.
-
-# Presented NeuroPlus and discussed its benefits in neuropathic pain management. Shared a product brochure and clinical comparison sheet. The doctor was not convinced due to concerns about pricing and availability and declined sample packs.
-
-# Need to send pharmacoeconomic evidence and revisit after a month.
-#             """
-#         }
-#     )
-#     print(result)
+# ---------------------------------------------------------------------------
+# Tool 5: Add a follow up
+# ---------------------------------------------------------------------------
 
 
-# async def main():
-#     result = await edit_interaction.ainvoke(
-#         {
-#             "interaction_id": 1,  # Change to an existing interaction ID
-#             "notes": """
-#             Follow-up meeting with Dr. Priya Chauhan.
-#             Discussed NeuroPlus in detail and answered pricing concerns.
-#             The doctor requested additional clinical evidence.
-#             """,
-#             "interaction_type": "AppointMent",
-#             "products_discussed": "NeuroPlus, Clinical Evidence Brochure",
-#         }
-#     )
+@tool("schedule_followup")
+async def schedule_followup(
+    interaction_id: int,
+    task_from_interaction: str,
+    days_from_now: int = 14,
+    status: str = "Pending",
+) -> str:
+    """
+    Schedule a follow-up
+    task -> String
+    due_date -> time
+    status -> default pending else Complected
+    """
 
-#     print(result)
+    async with async_session_factory() as db:
+        try:
+            result = await db.execute(
+                select(Interaction).where(Interaction.id == interaction_id)
+            )
+
+            interaction = result.scalar_one_or_none()
+
+            if interaction is None:
+                return json.dumps(
+                    {"status": "error", "message": "Interaction not found"}
+                )
+
+            due_date = (datetime.utcnow() + timedelta(days=days_from_now)).date()
+
+            task = FollowUpTask(
+                interaction_id=interaction_id,
+                task=task_from_interaction,
+                due_date=due_date,
+                status=status,
+            )
+            db.add(task)
+            await db.commit()
+            await db.refresh(task)
+
+            return json.dumps(
+                {
+                    "status": "success",
+                    "task_id": task.id,
+                    "interaction_id": interaction_id,
+                    "task": task.task,
+                    "due_date": task.due_date.isoformat(),
+                    "message": "Follow-up scheduled successfully.",
+                }
+            )
+        except Exception as e:
+            await db.rollback()
+            return json.dumps({"status": "error", "message": str(e)})
 
 
 async def main():
-    result = await suggest_followups.ainvoke(
+    result = await schedule_followup.ainvoke(
         {
-            "interaction_id": 1
+            "interaction_id": 1,
+            "task_from_interaction": "Schedule a follow-up meeting with Dr. Raj Sharma",
+            "days_from_now": 14,
         }
     )
 
