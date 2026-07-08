@@ -7,7 +7,7 @@ from app.db.session import get_db
 
 from sqlalchemy import select
 from app.agent.llm import extraction_llm, reasoning_llm
-
+from app.models import hcp_model, intraction_model, followUp_model
 
 # ---------------------------------------------------------------------------
 # Tool 1: log_interaction
