@@ -8,6 +8,8 @@ from app.models.intraction_model import Interaction
 from langchain_core.tools import tool
 from sqlalchemy import select
 
+import asyncio
+
 EXTRACTION_PROMPT = """You are a data-extraction assistant for a pharma CRM.
 Given a free-text note or transcript of a sales rep describing an HCP (Healthcare Professional)
 interaction, extract a strict JSON object with these fields:
@@ -162,6 +164,18 @@ async def edit_interaction(
     interaction_type: str | None = None,
     products_discussed: str | None = None,
 ):
+    """
+    Edit an existing HCP interaction.
+
+    Updates only the fields that are provided. If a field is None,
+    its current value is left unchanged.
+
+    Args:
+        interaction_id: ID of the interaction to edit.
+        notes: Updated interaction notes.
+        interaction_type: Updated interaction type.
+        products_discussed: Updated products discussed.
+    """
     async with async_session_factory() as db:
         result = await db.execute(
             select(Interaction).where(Interaction.id == interaction_id)
@@ -169,8 +183,84 @@ async def edit_interaction(
 
         interaction = result.scalar_one_or_none()
 
-        if notes:
-            interaction.= notes
+        if interaction is None:
+            return json.dumps({"status": "error", "message": "Interaction not found"})
+
+        if interaction is None:
+            return json.dumps(
+                {
+                    "status": "error",
+                    "message": "Interaction not found",
+                }
+            )
+
+        if notes is not None:
+            interaction.notes = notes # type: ignore[assignment]
+        if interaction_type is not None:
+            interaction.interaction_type = interaction_type # type: ignore[assignment]
+
+        if products_discussed is not None:
+            interaction.products_discussed = products_discussed # type: ignore[assignment]
+
+        
+        await db.commit()
+        await db.refresh(interaction)
+
+        return json.dumps(
+        {
+            "status": "success",
+            "interaction_id": interaction.id,
+            "message": "Interaction updated successfully.",
+        }
+    )
+
+
+@tool("search_hcp")
+async def search_hcp(query: str)->str:
+    """
+    Search for HCPs (Health care proffesional) by name speciality or hospital
+    used to auto complete the HCP name field and pull to prior context
+    """
+
+    async with async_session_factory() as db:
+        try:
+            result = await db.execute(
+                select(HCP).where(
+                    or_(
+                        HCP.name.ilike(f"%{query}%"),
+                        HCP.specialty.ilike(f"%{query}%"),
+                        HCP.hospital.ilike(f"%{query}%"),
+                        HCP.city.ilike(f"%{query}%"),
+                    )
+                )
+            )
+
+            hcps = result.scalar().all()
+
+            return json.dumps(
+                [
+                    {
+                        "id": hcp.id,
+                        "name": hcp.name,
+                        "specialty": hcp.specialty,
+                        "hospital": hcp.hospital,
+                        "city": hcp.city,
+                    }
+                    for hcp in hcps
+                ]
+            )
+        except Exception as e:
+            return json.dumps(
+                {
+                    "status": "error",
+                    "message": str(e),
+                }
+            )
+
+
+def 
+
+
 
 
 # async def main():
@@ -188,5 +278,23 @@ async def edit_interaction(
 #     print(result)
 
 
+# async def main():
+#     result = await edit_interaction.ainvoke(
+#         {
+#             "interaction_id": 1,  # Change to an existing interaction ID
+#             "notes": """
+#             Follow-up meeting with Dr. Priya Chauhan.
+#             Discussed NeuroPlus in detail and answered pricing concerns.
+#             The doctor requested additional clinical evidence.
+#             """,
+#             "interaction_type": "AppointMent",
+#             "products_discussed": "NeuroPlus, Clinical Evidence Brochure",
+#         }
+#     )
+
+#     print(result)
+
+
+
 # if __name__ == "__main__":
-#     asyncio.run(main())
+    # asyncio.run(main())
