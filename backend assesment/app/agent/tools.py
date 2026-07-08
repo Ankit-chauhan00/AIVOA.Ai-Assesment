@@ -1,4 +1,3 @@
-import asyncio
 import json
 from datetime import datetime, timedelta
 from typing import List, cast
@@ -84,12 +83,29 @@ async def log_interaction(text: str) -> str:
     prompt = EXTRACTION_PROMPT.format(text=text)
     raw = extraction_llm.invoke(prompt).content
 
-    if isinstance(raw, list):
-        raw = "".join(
-            item if isinstance(item, str) else json.dumps(item) for item in raw
-        )
+    print("=" * 50)
+    print("RAW RESPONSE")
+    print(type(raw))
+    print(raw)
+    print("=" * 50)
 
+    if isinstance(raw, list):
+        parts = []
+
+        for item in raw:
+            if isinstance(item, dict):
+                parts.append(item.get("text", ""))
+            else:
+                parts.append(str(item))
+
+        raw = "".join(parts)
+
+        
     data = _safe_json(raw) or {}
+    print("=" * 50)
+    print("PARSED JSON")
+    print(data)
+    print("=" * 50)
 
     hcp_name = data.get("hcp_name") or "Unknown HCP"
     interaction_type = data.get("interaction_type") or "Meeting"
@@ -148,6 +164,17 @@ async def log_interaction(text: str) -> str:
                     "hcp_id": hcp.id,
                     "hcp_name": hcp.name,
                     "message": "Interaction logged successfully.",
+                    "form_data": {
+                        "hcp_id": hcp.id,
+                        "hcp_name": hcp.name,
+                        "specialty": hcp.specialty,
+                        "hospital": hcp.hospital,
+                        "city": hcp.city,
+                        "interaction_type": interaction.interaction_type,
+                        "interaction_date": interaction.interaction_date.isoformat(),
+                        "notes": interaction.notes,
+                        "products_discussed": interaction.products_discussed,
+                    },
                 }
             )
         except Exception as e:
@@ -192,6 +219,12 @@ async def edit_interaction(
                 }
             )
 
+        result = await db.execute(select(HCP).where(HCP.id == interaction.hcp_id))
+        hcp = result.scalar_one_or_none()
+
+        if hcp is None:
+            return json.dumps({"status": "error", "message": "HCP not found"})
+
         if notes is not None:
             interaction.notes = notes  # type: ignore[assignment]
         if interaction_type is not None:
@@ -208,6 +241,18 @@ async def edit_interaction(
                 "status": "success",
                 "interaction_id": interaction.id,
                 "message": "Interaction updated successfully.",
+                "form_data": {
+                    "hcp_id": hcp.id,
+                    "hcp_name": hcp.name,
+                    "specialty": hcp.specialty,
+                    "hospital": hcp.hospital,
+                    "city": hcp.city,
+                    "interaction_id": interaction.id,
+                    "interaction_type": interaction.interaction_type,
+                    "interaction_date": interaction.interaction_date.isoformat(),
+                    "notes": interaction.notes,
+                    "products_discussed": interaction.products_discussed,
+                },
             }
         )
 
@@ -424,4 +469,11 @@ async def schedule_followup(
             await db.rollback()
             return json.dumps({"status": "error", "message": str(e)})
 
-ALL_TOOLS = [log_interaction,edit_interaction, search_hcp, suggest_followups, schedule_followup]
+
+ALL_TOOLS = [
+    log_interaction,
+    edit_interaction,
+    search_hcp,
+    suggest_followups,
+    schedule_followup,
+]

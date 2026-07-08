@@ -2,6 +2,7 @@
 LangGraph assistant pannel that powers the "AI Assistant" chat pannel on the log Intraction Screen
 """
 
+import asyncio
 from typing import Annotated, TypedDict
 
 from app.agent.llm import reasoning_llm
@@ -10,7 +11,6 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
-import asyncio
 
 SYSTEM_PROMPT = """
 You are an AI Assistant embedded in a Pharma CRM used by Medical Representatives (MRs) to manage Healthcare Professional (HCP) interactions.
@@ -117,6 +117,24 @@ async def run_agent(
 
     result = await hcp_agent.ainvoke({"messages": messages})
     final_message = result["messages"][-1]
+    reply = final_message.content
+
+    if isinstance(reply, list):
+        parts = []
+
+        for block in reply:
+            if isinstance(block, dict):
+                parts.append(block.get("text", ""))
+            elif hasattr(block, "text"):
+                parts.append(block.text)
+            else:
+                parts.append(str(block))
+
+        reply = " ".join(parts)
+
+    elif not isinstance(reply, str):
+        reply = str(reply)
+    
 
     tool_calls = []
     tool_results = []
@@ -152,14 +170,11 @@ async def run_agent(
     execution_trace.append("Generated final response")
 
     return {
-        "reply": final_message.content,
+        "reply": reply,
         "tool_calls": tool_calls,
         "tool_results": tool_results,
         "execution_trace": execution_trace,
     }
-
-
-import asyncio
 
 
 async def main():
@@ -189,9 +204,7 @@ async def main():
     print("\n================ TEST 2 =================")
     print("Search HCP\n")
 
-    result = await run_agent(
-        "Search for Dr. Raj Sharma."
-    )
+    result = await run_agent("Search for Dr. Raj Sharma.")
 
     print(result)
 
