@@ -17,15 +17,6 @@ extraction_llm = ChatGoogleGenerativeAI(model=google_llm_model)
 
 reasoning_llm = ChatGoogleGenerativeAI(model=google_llm_model)
 
-# reasoning_llm =  ChatOpenAI(
-#     model=grack_llm_model,
-#     api_key=grok_api_key, # type: ignore
-#     base_url="https://api.x.ai/v1"
-# )
 
-google_response =  extraction_llm.invoke("hello google")
-print(google_response.content)
 
-grok_response = reasoning_llm.invoke("hello grok")
-print(grok_response.content)
 

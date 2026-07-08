@@ -7,7 +7,7 @@ load_dotenv()
 class Settings(BaseSettings):
     SUPERBASE_DATABASE_URL: str
     GOOGLE_API_KEY:str
-    LLM_MODEL: str = "gemini-2.5-flash"
+    LLM_MODEL: str = "gemini-2.5-flash-lite"
     GROK_API_KEY: str 
     GROK_MODEL:str =  "grok-4"
 

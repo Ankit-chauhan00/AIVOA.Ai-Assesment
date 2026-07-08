@@ -33,7 +33,7 @@ class FollowUpTask(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.now()
+        default=datetime.now
     )
 
     interaction = relationship(

@@ -33,7 +33,7 @@ class Interaction(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.now()
+        default=datetime.now
     )
 
     hcp = relationship(
