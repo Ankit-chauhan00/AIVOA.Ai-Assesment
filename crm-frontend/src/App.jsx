@@ -1,5 +1,12 @@
-const App = () => {
-  return <div></div>;
-};
+import ChatPannel from "./components/ChatPannel"
 
-export default App;
+
+const App = () => {
+  return (
+    <div className="h-screen">
+      <ChatPannel />
+    </div>
+  )
+}
+
+export default App
