@@ -3,7 +3,6 @@ LLM Setup
 using this gemini model as this is free and i dont have tokens
 """
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
 from app.core.config import settings
 
 
