@@ -17,7 +17,7 @@ const ChatInput = ({ onSend, disabled }) => {
     }
   };
 
-  return <div className="flex gap-2 border-t border-[var(--border)] p-3">
+  return <div className="flex gap-2  bg-secondary-700 rounded-md p-3">
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -25,12 +25,12 @@ const ChatInput = ({ onSend, disabled }) => {
         disabled={disabled}
         rows={1}
         placeholder="Log a visit or ask something..."
-        className="flex-1 resize-none rounded-xl border border-[var(--border)] px-3 py-2 text-sm focus:border-[var(--assistant)] outline-none"
+        className="flex-1 resize-none rounded-xl border border-ink-muted  bg-secondary-500 px-3 py-2 text-sm  outline-none"
       />
       <button
         onClick={submit}
         disabled={disabled || !value.trim()}
-        className="rounded-xl bg-[var(--assistant)] px-4 py-2 text-sm text-white disabled:opacity-40"
+        className="rounded-xl  px-4 py-2 text-sm text-white disabled:opacity-40 border border-ink-faint bg-clinical-600 hover:scale-95"
       >
         Send
       </button>
