@@ -1,7 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI
 from app.schema.input_schema import ChatRequest, ChatResponse
-import json
+
 
 from app.agent.graph import run_agent
 
