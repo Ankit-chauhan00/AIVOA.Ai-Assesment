@@ -1,12 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Asap:ital,wght@0,100..900;1,100..900&family=Stack+Sans+Notch:wght@200..700&display=swap');
 @import "tailwindcss";
 
-:root {
-  --bg: #f7f8fa;
-  --surface: #ffffff;
-  --border: #e2e5ea;
-  --ink: #1b222c;
-  --ink-muted: #6b7280;
 
-  --clinical: #2954a6;      /* form side accent */
-  --assistant: #0e7c7b;     /* AI side accent */
+@theme {
+  --color-bg: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f0f2f5;
+  --color-border: #e2e5ea;
+  --color-border-strong: #cbd1db;
+
+  --color-ink: #1b222c;
+  --color-ink-muted: #6b7280;
+  --color-ink-faint: #9aa1ac;
+
+  --color-clinical-50: #eaf0fb;
+  --color-clinical-100: #d3e0f5;
+  --color-clinical-600: #2954a6;
+  --color-clinical-800: #1c3a76;
+
+  --color-assistant-50: #e7f5f4;
+  --color-assistant-100: #c9e9e7;
+  --color-assistant-600: #0e7c7b;
+  --color-assistant-800: #0a5958;
+
+  --color-success: #1f9d55;
+  --color-warning: #b7791f;
+  --color-danger: #c53030;
+
+ --color-primary: rgb(31, 31, 30);      /* was 0.122, 0.122, 0.118 */
+ --color-secondary: rgb(44, 44, 42);    /* was 0.173, 0.173, 0.165 */
+  --font-body: "Asap", sans-serif;
+  --font-display: "Stack Sans Notch", sans-serif;
 }
+
+
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+}
+

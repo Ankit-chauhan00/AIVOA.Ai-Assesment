@@ -23,7 +23,7 @@ const ChatPannel = () => {
   }
 
   return (
-   <div className="flex h-full flex-col">
+   <div className="flex h-full bg-secondary w-[60%] p-5 rounded-md flex-col">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.map((m, i) => (
           <MessageBubble key={i} role={m.role} content={m.content} />
